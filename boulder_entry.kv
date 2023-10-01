@@ -1,0 +1,629 @@
+ScreenManager:
+	MainMenuScreen:
+	EntryScreen:
+	EntryChoiceScreen:
+	EditScreen:
+	EditEntryScreen:
+	SettingsScreen:
+	GradingScreen:
+	ProgressScreen:
+
+
+<MainMenuScreen>:
+	name: 'Main Menu'
+	
+	MDFloatLayout:
+	
+		MDLabel:
+			id: gradelabel
+			theme_text_color: 'Custom'
+			text_color: 'white'
+			text: 'Current grade:'
+			halign: 'center'
+			size_hint: 0.3,0.1
+			font_size: 36
+			pos_hint: {'center_x':0.5,'center_y':0.7}
+		
+		MDLabel:
+			id: currentgrade
+			text: 'N/A'
+			theme_text_color: 'Custom'
+			text_color: 'white'
+			halign: 'center'
+			size_hint: 0.2,0.1
+			font_size: 48
+			pos_hint: {'center_x':0.5,'center_y':0.62}
+			
+			
+		MDRoundFlatIconButton:
+			text: 'New Entry'
+			theme_text_color: 'Custom'
+			text_color: 'white'
+			icon: 'plus'
+			font_size: 24
+			pos_hint: {'center_x':0.5,'center_y':0.5}
+			on_release:
+				app.update_screen()
+				root.manager.transition.direction = 'left'
+				root.manager.current = 'EntryChoice'
+		
+		MDRoundFlatIconButton:
+			text: 'Edit Entry'
+			theme_text_color: 'Custom'
+			text_color: 'white'
+			icon: 'pencil-outline'
+			font_size: 24
+			pos_hint: {'center_x':0.5,'center_y':0.4}
+			on_release:
+				app.update_screen()
+				app.displaydatatable()
+				root.manager.transition.direction = 'left'
+				root.manager.current = 'Edit'
+		
+		MDRoundFlatIconButton:
+			text: 'Progress'
+			theme_text_color: 'Custom'
+			text_color: 'white'
+			icon: 'chart-timeline-variant'
+			font_size: 24
+			pos_hint: {'center_x':0.5,'center_y':0.3}
+			on_release:
+				app.update_screen()
+				root.manager.transition.direction = 'left'
+				root.manager.current = 'Progress'
+			
+		MDRoundFlatIconButton:
+			text: 'Settings '
+			theme_text_color: 'Custom'
+			text_color: 'white'
+			icon: 'cog'
+			font_size: 24
+			pos_hint: {'center_x':0.5,'center_y':0.2}
+			on_release:
+				app.update_screen()
+				root.manager.transition.direction = 'left'
+				root.manager.current = 'Settings'
+		
+
+<EntryScreen>:
+	name: 'Entry'
+	MDFloatLayout:
+		size: root.width, root.height
+		md_bg_color: 0,0,0,1
+		
+		MDIconButton:
+			size_hint: 0.2,0.2
+			icon: 'arrow-left'
+			pos_hint: {'center_x':0.05, 'center_y':0.95}
+			on_release: 
+				root.manager.transition.direction = 'right'
+				root.manager.current = 'EntryChoice'
+		
+		MDIconButton:
+			size_hint: 0.2,0.2
+			icon: 'cog'
+			pos_hint: {'center_x':0.95,'center_y':0.95}
+			on_release:
+				app.update_screen()
+				root.manager.transition.direction = 'left'
+				root.manager.current = 'Settings'
+			
+		
+		MDTextField:
+			id: date
+			mode: 'round'
+			hint_text: 'yyyy-mm-dd'
+			font_size: 18
+			size_hint: None, None
+			width: root.width*0.2
+			pos_hint: {'center_x': 0.5, 'center_y': 0.7}
+			
+		MDIconButton:
+			size_hint: 0.1,0.1
+			icon: 'calendar'
+			pos_hint: {'center_x':0.58,'center_y':0.7}
+			on_release: app.show_date_picker()
+			
+		MDTextField:
+			id: grade
+			mode: 'round'
+			hint_text: 'grade'
+			font_size: 18
+			size_hint: None, None
+			width: root.width*0.2
+			pos_hint: {'center_x': 0.5, 'center_y': 0.6}
+			on_focus: app.open_grade_menu() if self.focus else None
+		
+		MDTextField:
+			id: attempts
+			mode: 'round'
+			hint_text: 'attempts'
+			font_size: 18
+			size_hint: None, None
+			width: root.width*0.2
+			pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+		
+		MDAnchorLayout:
+			pos_hint: {'center_x':0.47,'center_y':0.4}
+			MDLabel:
+				id: comp_checkbox
+				text: 'Completed:'
+				font_size: 24
+				theme_text_color: 'Custom'
+				text_color: 'white'
+				halign: 'center'
+		
+		MDCheckbox:
+			id: complete
+			size_hint: 0.1,0.1
+			pos_hint: {'center_x':0.57,'center_y':0.4}
+			color_inactive: 'white'
+			color_active: 'white'
+		
+		MDRoundFlatButton:
+			id: clear
+			text: 'Clear'
+			font_size: 18
+			size_hint: None,None
+			width: root.width*0.15
+			pos_hint: {'center_x': 0.4, 'center_y': 0.3}
+			on_press: app.clear()
+		
+		MDRoundFlatButton:
+			id: submit
+			text: 'Submit'
+			font_size: 18
+			size_hint: None,None
+			width: root.width*0.15
+			pos_hint: {'center_x': 0.6, 'center_y': 0.3}
+			on_press: 
+				app.input_data()
+
+
+<EntryChoiceScreen>:
+	name: 'EntryChoice'
+	MDFloatLayout:
+		MDIconButton:
+			size_hint: 0.2,0.2
+			icon: 'arrow-left'
+			pos_hint: {'center_x':0.05, 'center_y':0.95}
+			on_release: 
+				root.manager.transition.direction = 'right'
+				root.manager.current = 'Main Menu'
+		
+		MDIconButton:
+			size_hint: 0.2,0.2
+			icon: 'cog'
+			pos_hint: {'center_x':0.95,'center_y':0.95}
+			on_release:
+				app.update_screen()
+				root.manager.transition.direction = 'left'
+				root.manager.current = 'Settings'
+		
+		MDCard:
+			size_hint: 0.3,0.3
+			pos_hint: {'center_x':0.33,'center_y':0.5}
+			md_bg_color: '#EDD55F'
+			MDAnchorLayout:
+				MDRoundFlatButton:
+					text:'Boulder'
+					font_size: 36
+					size_hint: None, None
+					width: root.width*0.2
+					on_release: 
+						root.manager.get_screen('Entry').types = 'boulder'
+						root.manager.transition.direction = 'left'
+						root.manager.current = 'Entry'
+		
+		MDCard:
+			size_hint: 0.3,0.3
+			pos_hint: {'center_x':0.67,'center_y':0.5}
+			md_bg_color: '#EDD55F'
+			MDAnchorLayout:
+				MDRoundFlatButton:
+					text:'Route'
+					font_size: 36
+					size_hint: None, None
+					width: root.width*0.2
+					on_release:
+						root.manager.get_screen('Entry').types = 'route'
+						root.manager.transition.direction = 'left'
+						root.manager.current = 'Entry'
+					
+
+<EditScreen>:
+	name: 'Edit'
+	MDIconButton:
+		size_hint: 0.2,0.2
+		icon: 'arrow-left'
+		pos_hint: {'center_x':0.05, 'center_y':0.95}
+		on_release: 
+			root.manager.transition.direction = 'right'
+			root.manager.current = 'Main Menu'
+		
+	MDIconButton:
+		size_hint: 0.2,0.2
+		icon: 'cog'
+		pos_hint: {'center_x':0.95,'center_y':0.95}
+		on_release:
+			app.update_screen()
+			root.manager.transition.direction = 'left'
+			root.manager.current = 'Settings'
+	
+	MDIconButton:
+		size_hint: 0.2,0.2
+		icon: 'chevron-right'
+		pos_hint: {'center_x':0.9,'center_y':0.85}
+		on_release:
+			root.manager.get_screen('Edit').page = (root.manager.get_screen('Edit').page + 1) % 2
+			root.manager.get_screen('Edit').remove_widget(root.manager.get_screen('Edit').children[0])
+			app.displaydatatable()
+	
+		
+<EditEntryScreen>:
+	name: 'EditEntry'
+	MDFloatLayout:
+		size: root.width, root.height
+		md_bg_color: 0,0,0,1
+		
+		MDIconButton:
+			size_hint: 0.2,0.2
+			icon: 'arrow-left'
+			pos_hint: {'center_x':0.05, 'center_y':0.95}
+			on_release: 
+				root.manager.transition.direction = 'right'
+				root.manager.current = 'Edit'
+		
+		MDIconButton:
+			size_hint: 0.2,0.2
+			icon: 'cog'
+			pos_hint: {'center_x':0.95,'center_y':0.95}
+			
+		
+		MDTextField:
+			id: date
+			mode: 'round'
+			hint_text: 'yyyy-mm-dd'
+			font_size: 18
+			size_hint: None, None
+			width: root.width*0.2
+			pos_hint: {'center_x': 0.5, 'center_y': 0.7}
+			
+		MDIconButton:
+			size_hint: 0.1,0.1
+			icon: 'calendar'
+			pos_hint: {'center_x':0.58,'center_y':0.7}
+			on_release: app.show_date_picker()
+			
+		MDTextField:
+			id: grade
+			mode: 'round'
+			hint_text: 'grade'
+			font_size: 18
+			size_hint: None, None
+			width: root.width*0.2
+			pos_hint: {'center_x': 0.5, 'center_y': 0.6}
+			on_focus: app.open_edit_grade_menu() if self.focus else None
+		
+		MDTextField:
+			id: attempts
+			mode: 'round'
+			hint_text: 'attempts'
+			font_size: 18
+			size_hint: None, None
+			width: root.width*0.2
+			pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+		
+		MDAnchorLayout:
+			pos_hint: {'center_x':0.47,'center_y':0.4}
+			MDLabel:
+				id: comp_checkbox
+				text: 'Completed:'
+				font_size: 24
+				theme_text_color: 'Custom'
+				text_color: 'white'
+				halign: 'center'
+		
+		MDCheckbox:
+			id: complete
+			size_hint: 0.1,0.1
+			pos_hint: {'center_x':0.57,'center_y':0.4}
+			color_inactive: 'white'
+			color_active: 'white'
+		
+		MDRoundFlatButton:
+			id: clear
+			text: 'Clear'
+			font_size: 18
+			size_hint: None,None
+			width: root.width*0.15
+			pos_hint: {'center_x': 0.4, 'center_y': 0.3}
+			on_press: app.clear()
+		
+		
+		MDRoundFlatButton:
+			id: submit
+			text: 'Submit'
+			font_size: 18
+			size_hint: None,None
+			width: root.width*0.2
+			pos_hint: {'center_x': 0.6, 'center_y': 0.3}
+			on_press: 
+				app.edit_data()
+
+
+<SettingsScreen>
+	name: 'Settings'
+	MDBoxLayout:
+		orientation: 'vertical'
+		
+		MDTopAppBar:
+			title: 'Settings'
+			left_action_items: [['arrow-left',lambda x: app.SettingsReturn()]]
+			md_bg_color: '#E7EBDA'
+		
+		MDBoxLayout:
+			orientation: 'vertical'
+			
+			OneLineListItem:
+				text: 'Grade System Settings'
+				theme_text_color: 'Custom'
+				text_color: 'white'
+				on_release:
+					root.manager.transition.direction = 'left'
+					root.manager.current = 'Grading'
+			
+			OneLineListItem:
+				text: 'Tutorial'
+				theme_text_color: 'Custom'
+				text_color: 'white'
+			
+			OneLineListItem:
+				text: 'Support Us'
+				theme_text_color: 'Custom'
+				text_color: 'white'
+			
+			OneLineListItem:
+				text: 'Contact Us'
+				theme_text_color: 'Custom'
+				text_color: 'white'
+			
+			OneLineListItem:
+				text: 'Terms of Use'
+				theme_text_color: 'Custom'
+				text_color: 'white'
+		
+		MDWidget:
+		
+
+
+
+<GradingScreen>
+	name: 'Grading'
+	MDFloatLayout:
+		MDTopAppBar:
+			title: 'Set Grading System'
+			left_action_items: [['arrow-left',lambda x: app.SetGradeSettings()]]
+			pos_hint: {'top':1}
+			
+		MDBoxLayout:
+			id: bobox
+			pos_hint: {'x_center':None,'y_center':None}
+			pos: root.width/4 - self.width/2,root.height*0.6 - self.height/2
+			orientation: 'vertical'
+			size_hint: None, None
+			size: root.width*0.3,root.height*0.3
+			#md_bg_color: '#ffffff'
+			MDAnchorLayout:
+				MDIconButton:
+					icon: 'chevron-up'
+					icon_size: 70
+					on_release: bocar.load_next()
+			MDCarousel:
+				id: bocar
+				loop: True
+				direction: 'top'
+				MDBoxLayout:
+					id: USA
+					orientation:'vertical'
+					MDLabel:
+						text: 'USA'
+						halign: 'center'
+						font_size: 36
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'white'
+						
+					MDLabel:
+						text: 'V0, V1, V2'
+						halign: 'center'
+						font_size: 18
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'grey'
+						
+				MDBoxLayout:
+					id: FONT
+					orientation: 'vertical'
+					MDLabel:
+						text: 'FONT'
+						halign: 'center'
+						font_size: 36
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'white'
+					MDLabel:
+						text: '5+, 6a, 6a+'
+						halign: 'center'
+						font_size: 18
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'grey'
+				MDBoxLayout:
+					id: DAN
+					orientation: 'vertical'
+					MDLabel:
+						text: 'DAN'
+						halign: 'center'
+						font_size: 36
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'white'
+					MDLabel:
+						text: '7 kyu, 6 kyu, 5 kyu'
+						halign: 'center'
+						font_size: 18
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'grey'
+			
+			MDAnchorLayout:
+				MDIconButton:
+					icon: 'chevron-down'
+					icon_size: 70
+					on_release: bocar.load_previous()
+			
+			MDAnchorLayout:
+				MDLabel:
+					text: 'Bouldering'
+					font_size: 24
+					halign: 'center'
+					theme_text_color: 'Custom'
+					text_color: 'white'
+			
+			
+		MDBoxLayout:
+			id: robox
+			pos_hint: {'x_center':None,'y_center':None}
+			pos: root.width*0.75 - self.width/2,root.height*0.6 - self.height/2
+			orientation: 'vertical'
+			size_hint: None, None
+			size: root.width*0.3,root.height*0.3
+			#md_bg_color: '#ffffff'
+			MDAnchorLayout:
+				MDIconButton:
+					icon: 'chevron-up'
+					icon_size: 70
+					on_release: rocar.load_next()
+			MDCarousel:
+				id: rocar
+				loop: True
+				direction: 'top'
+				MDBoxLayout:
+					id: YDS
+					orientation:'vertical'
+					MDLabel:
+						text: 'YDS'
+						halign: 'center'
+						font_size: 36
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'white'
+						
+					MDLabel:
+						text: '5.1, 5.2, 5.3'
+						halign: 'center'
+						font_size: 18
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'grey'
+						
+				MDBoxLayout:
+					id: FR
+					orientation: 'vertical'
+					MDLabel:
+						text: 'FR'
+						halign: 'center'
+						font_size: 36
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'white'
+					MDLabel:
+						text: '2, 3a, 3b'
+						halign: 'center'
+						font_size: 18
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'grey'
+				MDBoxLayout:
+					id: AUS
+					orientation: 'vertical'
+					MDLabel:
+						text: 'AUS'
+						halign: 'center'
+						font_size: 36
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'white'
+					MDLabel:
+						text: '4, 5, 6'
+						halign: 'center'
+						font_size: 18
+						size: root.width*0.2,root.height*0.1
+						theme_text_color:'Custom'
+						text_color: 'grey'
+			
+			MDAnchorLayout:
+				MDIconButton:
+					icon: 'chevron-down'
+					icon_size: 70
+					on_release: rocar.load_previous()
+			
+			MDAnchorLayout:
+				MDLabel:
+					text: 'Routes'
+					font_size: 24
+					halign: 'center'
+					theme_text_color: 'Custom'
+					text_color: 'white'
+
+
+<ProgressScreen>
+	name: 'Progress'
+	MDIconButton:
+		size_hint: 0.2,0.2
+		icon: 'arrow-left'
+		pos_hint: {'center_x':0.05, 'center_y':0.95}
+		on_release: 
+			root.manager.transition.direction = 'right'
+			root.manager.current = 'Main Menu'
+		
+	MDIconButton:
+		size_hint: 0.2,0.2
+		icon: 'cog'
+		pos_hint: {'center_x':0.95,'center_y':0.95}
+		on_release:
+			app.update_screen()
+			root.manager.transition.direction = 'left'
+			root.manager.current = 'Settings'
+	MDGridLayout:
+		id: graph_container
+		cols: 1
+		padding: 40
+		spacing: 20
+		size_hint_y: None
+		
+			
+			
+			
+			
+			
+					
+				
+	
+	
+				
+			
+				
+				
+				
+					
+				
+			
+			
+		
+		
+			
+		
+		
+			
