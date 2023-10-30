@@ -2,11 +2,14 @@ from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivymd.app import MDApp
 from kivymd.uix.pickers import MDDatePicker
+from kivy.uix.textinput import TextInput
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.datatables import MDDataTable
 from kivymd.uix.relativelayout import MDRelativeLayout
+from kivymd.uix.label import MDLabel
 from kivy.metrics import dp
 from kivy.core.window import Window
+from kivy.uix.widget import Widget
 import sqlite3
 from time import sleep
 from time import tzname
@@ -15,26 +18,53 @@ import io
 import os
 import numpy as np
 from time import time
-from datetime import datetime
+from datetime import datetime, date
 from calendar import timegm
 import scipy.optimize as opt
 import scipy.stats as st
 #import matplotlib.pyplot as plt
-from math import floor
+from math import floor, ceil
 import logging
 from kivy_garden.graph import Graph, MeshLinePlot
+from kivy.animation import Animation
+from kivymd.uix.behaviors.toggle_behavior import MDToggleButton
+from kivymd.uix.button import MDFlatButton
+from kivy.core.text import LabelBase
+from kivymd.uix.card import MDCard
+from kivymd.uix.anchorlayout import MDAnchorLayout
+from kivymd.uix.gridlayout import MDGridLayout
+from kivymd.uix.floatlayout import MDFloatLayout
+from kivy.uix.image import Image
+from kivy.graphics import *
+from kivy.config import Config
+from kivymd.uix.button import MDRoundFlatButton
+LabelBase.register(name='SometypeMono',fn_regular='Fonts\SometypeMono-Regular.ttf',fn_bold='Fonts\SometypeMono-Bold.ttf')
+'''Config.set('graphics','width',850)
+Config.set('graphics','height',850)
+Config.write()'''
+x_px = 2340
+y_px = 1080
+dpi = 425
 
+x_dp = x_px/(dpi/160)
+y_dp = y_px/(dpi/160)
+Window.size = (300,600)
 
 
 #logging.getLogger('matplotlib.font_manager').disabled = True
+class MyToggleButton(MDFlatButton, MDToggleButton):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.background_down = self.theme_cls.primary_color
 
-    
+
 def create_settings_file():
-    default_settings = {'boulder_grading':'USA','route_grading':'YDS','current_grade': 'N/A','current_slope':'N/A'}
+    default_settings = {'boulder_grading':'USA','route_grading':'YDS','current_boulder_grade': 'N/A','current_boulder_slope':'N/A','current_route_grade':'N/A','current_route_slope':'N/A'}
     json_object = json.dumps(default_settings, indent=4)
     with open('settings.json','w') as settings_file:
         settings_file.write(json_object)
 
+        
 
 class MainMenuScreen(Screen):
     pass
@@ -42,7 +72,175 @@ class MainMenuScreen(Screen):
 class EntryScreen(Screen):
     def __init__(self,**kwargs):
         super(EntryScreen,self).__init__(**kwargs)
-        self.types = None
+        self.types = 'boulder'
+        self.date = self.current_date()
+        self.grade = None
+        self.attempts = 1
+        self.comp = 0
+        self.edit = False
+        self.caller = None
+
+        self.on_widget = None
+
+    def setup_grade_buttons(self):
+        container = self.ids.gradecontainer
+        container.clear_widgets()
+        grade_list = []
+        if self.types == 'boulder':
+            bsetting = MDApp.get_running_app().root.get_screen('Settings').boulder_setting
+            grade_list_raw = MDApp.get_running_app().create_grades_list(bsetting.upper())
+            for i in grade_list_raw:
+                grade_list.append(i['text'])
+        if self.types == 'route':
+            rsetting = MDApp.get_running_app().root.get_screen('Settings').route_setting
+            grade_list_raw = MDApp.get_running_app().create_grades_list(rsetting.upper())
+            for i in grade_list_raw:
+                grade_list.append(i['text'])
+        for i in grade_list:
+            new_button = MDRoundFlatButton(text=i,on_press=self.gradechoice)
+            new_button.font_name = 'SometypeMono'
+            container.add_widget(new_button)
+        
+            
+    def gradechoice(self,widget):
+        if self.on_widget:
+            self.on_widget.md_bg_color = (1,1,1,0)
+        widget.md_bg_color = (1,1,1,1)
+        self.on_widget = widget
+        self.grade = widget.text
+
+    def change_grade_state(self,widget):
+        self.types = widget.text.lower()
+        container = self.ids.gradecontainer
+        container.clear_widgets()
+        self.setup_grade_buttons()
+        
+
+    def current_date(self):
+        cdate = date.today()
+        return str(cdate)
+
+
+    def clear_data(self):
+        self.types = 'boulder'
+        self.date = self.current_date()
+        self.grade = None
+        self.attempts = 1
+        self.comp = 0
+
+    def clear_display(self):
+        self.clear_data()
+        self.setup_grade_buttons()
+        self.ids.date.text = self.date
+        self.ids.bstate.state = 'down'
+        self.ids.rstate.state = 'normal'
+        
+        if self.on_widget:
+            self.on_widget.md_bg_color=(1,1,1,0)
+        self.ids.attempts.text = str(self.attempts)
+        self.ids.complete.active = self.comp
+        
+
+    def plus(self,widget):
+        self.attempts += 1
+        widget.text = str(self.attempts)
+
+    def minus(self,widget):
+        if self.attempts > 1:
+            self.attempts -= 1
+            widget.text = str(self.attempts)
+
+    def on_save(self,value,instance,date_range):
+        self.date = str(instance)
+        self.ids.date.text = str(instance)
+
+    def show_date_picker(self):
+        date_dialog = MDDatePicker()
+        date_dialog.bind(on_save=self.on_save)
+        date_dialog.open()
+
+    def get_data(self):
+        return self.date,self.grade,self.attempts,self.comp,self.types
+        
+    def fill(self):
+        self.date,self.grade,self.attempts,self.comp,self.types = self.caller.get_data()
+        self.setup_grade_buttons()
+        if self.types == 'route':
+            self.ids.bstate.state = 'normal'
+            self.ids.rstate.state = 'down'
+        gradebuttons = self.ids.gradecontainer.children
+        for i in gradebuttons:
+            if i.text == self.caller.grade:
+                self.on_widget = i
+                break
+
+        button_num = len(self.ids.gradecontainer.children)
+        button_index = button_num - self.ids.gradecontainer.children.index(self.on_widget) -1 
+        scroll_val = button_index/button_num
+        self.ids.gradescroller.scroll_x = scroll_val
+        
+        self.ids.date.text = self.caller.date
+        self.on_widget.md_bg_color = 1,1,1,1
+        self.ids.attempts.text = str(self.caller.attempts)
+        self.ids.complete.active = self.caller.comp
+        
+        
+
+    def shake_check(self,widget):
+        correct_format = self.check_date_format(widget)
+        if correct_format == False:
+            self.shake(widget)
+            widget.text = ''
+        
+
+    def check_date_format(self,widget):
+        date_input = widget.text
+        if len(date_input) != 10:
+            return False
+
+        year = date_input[:4]
+        month = date_input[5:7]
+        day = date_input[8:10]
+        dash1 = date_input[4]
+        dash2 = date_input[7]
+        day_dict = {1:31,2:29,3:31,4:30,5:31,6:30,7:31,8:31,9:30,10:31,11:30,12:31}
+        leap_year = None
+        if int(year) % 4 == 0:
+            leap_year = True
+        else:
+            leap_year = False
+
+
+        if len(year) != 4 or len(month) != 2 or len(day) != 2:
+            return False
+        if int(month) > 12 or int(month) < 1:
+            return False
+        if dash1 != '-' or dash2 != '-':
+            return False
+
+        if int(day) > day_dict[int(month)] or int(day) < 1:
+            return False
+        if int(day) >= 29 and not leap_year and int(month) == 2:
+            return False
+
+        return True
+        
+        
+
+
+    def shake(self,widget,*args):
+        pos_hint_x = widget.pos_hint['center_x']
+        pos_hint_y = widget.pos_hint['center_y']
+        animate = Animation(
+            pos_hint={'center_x':pos_hint_x+0.02,'center_y':pos_hint_y},
+            duration=0.04)
+        animate += Animation(
+            pos_hint={'center_x':pos_hint_x-0.02,'center_y':pos_hint_y},
+            duration=0.04)
+        animate += Animation(
+            pos_hint={'center_x':pos_hint_x,'center_y':pos_hint_y},
+            duration=0.04)
+        animate.start(widget)
 
 class EntryChoiceScreen(Screen):
     pass
@@ -57,6 +255,14 @@ class EditEntryScreen(Screen):
         super(EditEntryScreen,self).__init__(**kwargs)
         self.row_data = None
         self.row_id = None
+        self.caller = None
+
+    def fill(self):
+        self.ids.date.text = self.caller.date
+        self.ids.grade.text = self.caller.grade
+        self.ids.attempts.text = self.caller.attempts
+        self.ids.complete.active = self.caller.comp
+        
 
 class SettingsScreen(Screen):
     def __init__(self,**kwargs):
@@ -65,22 +271,45 @@ class SettingsScreen(Screen):
         self.previous_screen = None
         self.boulder_setting = None
         self.route_setting = None
-        self.current_grade = None
-        self.current_slope = None
+        self.current_boulder_grade = None
+        self.current_boulder_slope = None
+        self.current_route_grade = None
+        self.current_route_slope = None
         self.timezone = 'EST'
 
-        with open('settings.json','r+') as settings_file:
-            settings_data = json.load(settings_file)
-            self.boulder_setting = settings_data['boulder_grading']
-            self.route_setting = settings_data['route_grading']
-            self.current_grade = settings_data['current_grade']
-            self.current_slope = settings_data['current_slope']
+        self.retrieve_settings()
+
+        
 
     def startupCheck(self):
         if os.path.isfile('settings.json') and os.access('settings.json',os.R_OK):
             pass
         else:
             create_settings_file()
+
+    def retrieve_settings(self):
+        with open('settings.json','r+') as settings_file:
+            settings_data = json.load(settings_file)
+            self.boulder_setting = settings_data['boulder_grading']
+            self.route_setting = settings_data['route_grading']
+            self.current_boulder_grade = settings_data['current_boulder_grade']
+            self.current_boulder_slope = settings_data['current_boulder_slope']
+            self.current_route_grade = settings_data['current_route_grade']
+            self.current_route_slope = settings_data['current_route_slope']
+
+    def update_settings_file(self):
+        with open('settings.json','r+') as settings_file:
+            data = json.load(settings_file)
+            data['boulder_grading'] = self.boulder_setting
+            data['route_grading'] = self.route_setting
+            data['current_boulder_grade'] = self.current_boulder_grade
+            data['current_boulder_slope'] = self.current_boulder_slope
+            data['current_route_grade'] = self.current_route_grade
+            data['current_route_slope'] = self.current_route_slope
+            settings_file.seek(0)
+            json.dump(data, settings_file, indent = 4)
+            settings_file.truncate()
+
 
     
 
@@ -95,6 +324,7 @@ class ProgressScreen(Screen):
         self.bsystem, self.rsystem = self.get_grade_settings()
         self.timezone = 'EST'
         self.bodata, self.rodata =  self.get_timeline_data()
+        self.gstate = 'boulder'
         
         
         
@@ -145,8 +375,13 @@ class ProgressScreen(Screen):
         return date + timezone_dict[timezone]
 
     def timestamp_to_date(self,timestamp):
-        date = str(datetime.fromtimestamp(timestamp))
-        return date[:10]
+        raw_date = str(datetime.fromtimestamp(timestamp))
+        date = raw_date[:10]
+        year = date[2:4]
+        month = date[5:7]
+        day = date[8:10]
+        pretty = month + '/' + day
+        return pretty
 
     def create_points(self,data):
         points = []
@@ -155,7 +390,8 @@ class ProgressScreen(Screen):
             start_time = sorted_data[0][0]
             end_time = sorted_data[len(sorted_data)-1][0] + 10*86400
             days_between = int((end_time - start_time)/86400)
-            for i in range(days_between):
+            day_max = ceil(days_between/5)*5
+            for i in range(day_max+ceil(days_between/5)+1):
                 day_i = start_time + 86400*i
                 rel_time = (day_i - start_time)/86400
                 if rel_time not in self.date_dict:
@@ -167,6 +403,7 @@ class ProgressScreen(Screen):
                     point = (rel_time,float(i[1]))
                     points.append(point)
         return points
+    
 
 class Plot(MDRelativeLayout):
     def __init__(self,types,points,x_tick_names=None,y_tick_names=None,**kwargs):
@@ -175,9 +412,11 @@ class Plot(MDRelativeLayout):
         self.x_tick_names = x_tick_names
         self.y_tick_names = y_tick_names
         self.max_x,self.max_y = self.set_max_values(points)
-        self.graph = Graph(x_alt_ticks=self.x_tick_names,y_alt_ticks=self.y_tick_names,xlabel="Date", ylabel="Grade", x_ticks_minor=5, x_ticks_major=5, y_ticks_major=1,
-                           y_grid_label=True, x_grid_label=True, x_grid=True, y_grid=True,
-                           xmin=-0, xmax=self.max_x, ymin=0, ymax=self.max_y, draw_border=False,x_ticks_angle=45)
+        self.graph = Graph(x_alt_ticks=self.x_tick_names,y_alt_ticks=self.y_tick_names,xlabel='', ylabel='', x_ticks_minor=5, x_ticks_major=ceil(self.max_x/5), y_ticks_major=1,
+                           y_grid_label=True, x_grid_label=True, x_grid=False, y_grid=True,
+                           xmin=-0, xmax=self.max_x, ymin=0, ymax=self.max_y, draw_border=False,x_ticks_angle=0)
+        self.graph.font_name = 'SometypeMono'
+        self.graph.font_size = '10sp'
         
 
         self.plot = MeshLinePlot(color=[1, 1, 1, 1])
@@ -199,65 +438,238 @@ class Plot(MDRelativeLayout):
         max_x = high_x + (10 - (high_x % 10))
         max_y = high_y + (5 - (high_y % 5))
 
-        return max_x,max_y
-
-
+        return max_x,max_y        
         
         
 
+
+class EntryItem(MDCard):
+    def __init__(self,idnum = None,date=None,grade=None,attempts=None,comp=None,types=None,img=None,**kwargs):
+        super(EntryItem, self).__init__(**kwargs)
+        self.types = types
+        self.img = img
+        if self.img == None:
+            if types == 'boulder':
+                self.img = 'Images/rock.png'
+            if types == 'route':
+                self.img = 'Images/snowed-mountains.png'
+            
+        self.idnum = idnum
+        self.date = date
+        self.grade = grade
+        self.attempts = attempts
+        self.comp = comp
+        self.bind(on_release=self.show_dropdown_menu)
+        edit_option = {'text':'Edit','viewclass':'OneLineListItem','on_release':lambda x='edit': self.menu_callback(x)}
+        delete_option = {'text':'Delete','viewclass':'OneLineListItem','on_release':lambda x='delete': self.menu_callback(x)}
+        self.menu = [edit_option,delete_option]
+
+        grid = MDGridLayout(cols=3)
+        self.add_widget(grid)
+
+
+        icon_layout = MDFloatLayout()
+        lbl_layout = MDGridLayout(cols=1,rows=4,spacing=0)
+        att_layout = MDFloatLayout()
+        grid.add_widget(icon_layout)
+        grid.add_widget(lbl_layout)
+        grid.add_widget(att_layout)
+        
+        top_blank_anchor = MDAnchorLayout()
+        bottom_blank_anchor = MDAnchorLayout()
+        date_anchor = MDAnchorLayout(anchor_x='left',anchor_y='bottom')
+        grade_anchor = MDAnchorLayout(anchor_x='left',anchor_y='top')
+        lbl_layout.add_widget(top_blank_anchor)
+        lbl_layout.add_widget(date_anchor)
+        lbl_layout.add_widget(grade_anchor)
+        lbl_layout.add_widget(bottom_blank_anchor)
+
+        
+        self.icon = Image(source=self.img,size_hint_x=None,size_hint_y=None,keep_ratio=False,allow_stretch=True,pos_hint={'center_x':0.45,'center_y':0.5})
+        self.icon.size = icon_layout.size
+        icon_layout.add_widget(self.icon)
+
+        self.date_label = MDLabel(text=self.date,halign='left',size_hint_x=None)
+        self.date_label.font_size = '12sp'
+        self.date_label.font_name = 'SometypeMono'
+        date_anchor.add_widget(self.date_label)
+        
+
+        self.grade_label =MDLabel(text=self.grade,halign='left',size_hint_x=None)
+        self.grade_label.font_size = '24sp'
+        self.grade_label.font_name='SometypeMono'
+        grade_anchor.add_widget(self.grade_label)
+
+        self.att_label = MDLabel(text=str(self.attempts),halign='center',size_hint_x=None,pos_hint={'center_x':0.5,'center_y':0.375})
+        self.att_label.font_size='24sp'
+        self.att_label.font_name='SometypeMono'
+        att_layout.add_widget(self.att_label)
+
+        self.att_text_label = MDLabel(text='attempts',halign='center',size_hint_x=None,pos_hint={'center_x':0.5,'center_y':0.625})
+        self.att_text_label.font_size='12sp'
+        self.att_text_label.font_name='SometypeMono'
+        att_layout.add_widget(self.att_text_label)
+
+        
+        if self.comp == 1:
+            self.md_bg_color = (0.3,0.4,0.1,1)
+        elif self.comp == 0:
+            self.md_bg_color = (0.85,0.14,0.31,1)
+        else:
+            print('ERROR')
+
         
         
+        '''with self.canvas:
+            padding = 20
+            spacing = 10
+            win_width = dp(300)
+            Color(0,0,0,1)
+            Line(points=[win_width*(2/3)-(1/3)*padding,padding,win_width*(2/3)-(1/3)*padding,padding+self.size[1]],width=1.1)'''
+            
+
+    def get_data(self):
+        return self.date,self.grade,self.attempts,self.comp,self.types
+
+    def update_display(self):
+        self.icon.source = self.img
+        self.date_label.text = str(self.date)
+        self.grade_label.text = str(self.grade)
+        self.att_label.text = str(self.attempts)
+        if self.comp == 1:
+            self.md_bg_color = (0.3,0.4,0.1,1)
+        elif self.comp == 0:
+            self.md_bg_color = (0.85,0.14,0.31,1)
+        else:
+            print('ERROR')
         
+
+    def update(self,ddate,ggrade,aattempts,ccomp,ttypes):
+        self.date = ddate
+        self.grade = ggrade
+        self.attempts = aattempts
+        self.comp = ccomp
+        self.types = ttypes
+        if self.types == 'boulder':
+            self.img = 'Images/rock.png'
+        if self.types == 'route':
+            self.img = 'Images/snowed-mountains.png'
+        self.update_display()
+        
+
+        
+        
+    def menu_callback(self,option):
+        
+        if self.parent != None:
+            gsystem = None
+            if self.types == 'boulder':
+                with open('settings.json','r+') as s_file:                
+                    data = json.load(s_file)
+                    gsystem = data['boulder_grading']
+            if self.types == 'route':
+                with open('settings.json','r+') as s_file:
+                    data = json.load(s_file)
+                    gsystem = data['route_grading']
+            if option == 'edit':
+                editentry = MDApp.get_running_app().root.get_screen('EditEntry')
+                editentry.edit = True
+                editentry.caller = self
+                editentry.fill()
+                MDApp.get_running_app().root.current = 'EditEntry'
+            elif option == 'delete':
+                bldr_data = sqlite3.connect("boulder_data.db")
+                cur = bldr_data.cursor()
+                cur.execute('DELETE FROM %s WHERE id=%s' % (gsystem,self.idnum))
+                bldr_data.commit()
+                cur.close()
+                bldr_data.close()
+
+                MDApp.get_running_app().update_grade(self.types)
+                MDApp.get_running_app().update_timeline_table(self.date,self.types)
+                self.parent.remove_widget(self)
+            else:
+                print('something went wrong')
+            self.ddmenu.dismiss()
+            
+        
+
+    def show_dropdown_menu(self,widget):
+        self.ddmenu = MDDropdownMenu(caller=widget,items=self.menu,width_mult=2)
+        self.ddmenu.open()
+        
+        
+'''class gradebutton(Widget):
+    def __init__(self,radius=None,**kwargs):
+        super(gradebutton,self).__init__(**kwargs)
+        self.radius = radius
+        self.size = (self.radius,self.radius)
+        with self.canvas:
+            Color(0.3,0.6,0.5,1)
+            self.circ = Ellipse(size=(self.radius,self.radius),angle_start=0,angle_end=360)
+            self.bind(pos=self.update_circ)
+
+    def update_circ(self,*args):
+        self.circ.pos = self.pos
+        self.size = self.circ.size
         
             
+
+    def test_callback(self,inst):
+        print(inst)'''
             
-        
-        
+            
+            
+            
 
 sm = ScreenManager()
-sm.add_widget(MainMenuScreen(name='Main Menu'))
-sm.add_widget(EntryScreen(name='Entry'))
-sm.add_widget(EntryChoiceScreen(name='EntryChoice'))
-sm.add_widget(EditScreen(name='Edit'))
-sm.add_widget(EditEntryScreen(name='EditEntry'))
-sm.add_widget(SettingsScreen(name='Settings'))
-sm.add_widget(GradingScreen(name='Grading'))
-sm.add_widget(ProgressScreen(name='Progress'))
+#sm.add_widget(MainMenuScreen(name='Main Menu'))
+#sm.add_widget(EntryScreen(name='Entry'))
+#sm.add_widget(EntryScreen(name='EditEntry'))
+#sm.add_widget(SettingsScreen(name='Settings'))
+#sm.add_widget(GradingScreen(name='Grading'))
+#sm.add_widget(ProgressScreen(name='Progress'))
 
-#x=[1,2,3]
-#y = [1,2,3]
-#plt.plot(x,y)
-#plt.ylabel('y')
-#plt.xlabel('x')
+
 
 class BoulderBuddyApp(MDApp):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        
-        self.vgrades = self.create_grades_list('bouldering','USA')
-        self.fontgrades = self.create_grades_list('bouldering','FONT')
-        self.dangrades = self.create_grades_list('bouldering','DAN')
-        self.yds = self.create_grades_list('route','YDS')
-        self.fr = self.create_grades_list('route','FR')
-        self.aus = self.create_grades_list('route','AUS')
-        
-        self.root = Builder.load_file('boulder_entry.kv')
-        self.set_carousel()
+        self.vgrades = self.create_grades_list('USA')
+        self.fontgrades = self.create_grades_list('FONT')
+        self.dangrades = self.create_grades_list('DAN')
+        self.yds = self.create_grades_list('YDS')
+        self.fr = self.create_grades_list('FR')
+        self.aus = self.create_grades_list('AUS')
+
+        self.b_max_idnum = 0
+        self.r_max_idnum = 0
+
         self.create_datatables()
+        self.root = Builder.load_file('boulder_entry.kv')
+        self.set_grade_carousel()
+        self.update_grade('boulder')
         self.set_grade_display()
-
-        grade_dict = self.make_grade_dict('usa')
-        date_dict = self.root.get_screen('Progress').date_dict
+        self.setup_entries()
+        self.root.get_screen('Entry').setup_grade_buttons()
+        #self.root.get_screen('EditEntry').setup_grade_buttons()
         
 
+        self.bgraph,self.rgraph = self.create_graphs()
 
-        bpoints = self.root.get_screen('Progress').bodata
-        self.bgraph = Plot('bouldering',bpoints,x_tick_names=date_dict,y_tick_names=grade_dict,size_hint_y=None,height=500)
-        container = self.root.get_screen('Progress').ids.graph_container
-        container.bind(minimum_size=container.setter('size'))
-        container.add_widget(self.bgraph)
+
+        if self.bgraph:
+            container = self.root.get_screen('Progress').ids.graph_container
+            container.bind(minimum_size=container.setter('size'))
+            container.add_widget(self.bgraph)
+        else:
+            self.set_NED_label()
+
+        
+    
+        
 
         
 
@@ -266,9 +678,180 @@ class BoulderBuddyApp(MDApp):
 
     def build(self):
         self.theme_cls.theme_style = "Dark"
-        self.theme_cls.primary_palette = "BlueGray"
+        self.theme_cls.primary_palette = "Red"
         
         return self.root
+
+    '''def setup_grade_buttons(self):
+        bsystem = self.root.get_screen('Settings').boulder_setting
+        rsystem = self.root.get_screen('Settings').route_setting
+        current_system = self.root.get_screen('Entry').types
+        entry_container = self.root.get_screen('Entry').gradecontainer
+        edit_container = self.root.get_screen('EditEntry')
+        grade_list = None
+        if current_system == 'boulder':
+            grade_list = self.create_grades_list(bsystem.upper())
+        elif current_system == 'route':
+            grade_list = self.create_grades_list(rsystem.upper())
+        else:
+            print('current_system')
+        for i in grade_list:
+            new_button = MDFloatingActionButton()
+            entry_container.add_widget(new_button)'''
+            
+            
+            
+                
+        
+
+    def setup_entries(self):
+        data_master = []
+        bgrade = self.root.get_screen('Settings').boulder_setting
+        rgrade = self.root.get_screen('Settings').route_setting
+        
+        bldr_data = sqlite3.connect("boulder_data.db")
+        cur = bldr_data.cursor()
+        
+        cur.execute('SELECT * FROM %s' % bgrade)
+        bdata = cur.fetchall()
+        cur.execute('SELECT * FROM %s' % rgrade)
+        rdata=cur.fetchall()
+        
+        cur.close()
+        bldr_data.close()
+
+        data_master = bdata + rdata
+        data_master.sort(key=lambda dpoint: datetime.strptime(dpoint[1],'%Y-%m-%d'))
+        data_master.reverse()
+        
+        container = self.root.get_screen('Main Menu').ids.entry_container
+        if len(container.children) != 0:
+            container.clear_widgets()
+        
+        for i in data_master:
+            iidnum = i[0]
+            ddate = i[1]
+            ggrade = i[2]
+            aattempts = i[3]
+            ccompleted = i[4]
+            types = None
+            if i in bdata:
+                types='boulder'
+                if self.b_max_idnum < iidnum:
+                    self.b_max_idnum = iidnum
+            else:
+                types = 'route'
+                if self.r_max_idnum < iidnum:
+                    self.r_max_idnum = iidnum
+            entry = EntryItem(idnum=iidnum,
+                              date=ddate,
+                              grade=ggrade,
+                              attempts=aattempts,
+                              comp = ccompleted,
+                              types = types,
+                              size=('100dp','100dp'),
+                              pos_hint={'center_x':0.5,'center_y':0.5},
+                              size_hint_y=None)
+            container.add_widget(entry)
+
+    
+        
+        
+
+        
+        
+
+    def toolbar_callbacks(self,widget):
+        if widget == 'entries':
+            self.update_screen()
+            self.root.current = 'Main Menu'
+        elif widget == 'progress':
+            self.update_screen()
+            self.root.current = 'Progress'
+        elif widget == 'compare':
+            print('compare')
+        elif widget == 'settings':
+            self.update_screen()
+            self.root.current = 'Settings'
+        elif widget == 'new entry':
+            self.update_screen()
+            self.current_date()
+            self.root.get_screen('Entry').ids.bstate.state = 'down'
+            self.root.get_screen('Entry').types = 'boulder'
+            self.root.current = 'Entry'
+        else:
+            settings_button = widget.children[1].children[0].children[0]
+            compare_button = widget.children[1].children[0].children[1]
+            progress_button = widget.children[1].children[2].children[0]
+            entries_button = widget.children[1].children[2].children[1]
+            #settings_button.md_bg_color = [0.5,0.8,0.3,1]
+            #test_button.md_bg_color = [0.5,0.8,0.3,1]
+            
+    
+
+    def current_date(self):
+        cdate = date.today()
+        self.root.get_screen('Entry').ids.date.text = str(cdate)
+        
+    def set_NED_label(self):
+        self.NEDLabel = MDLabel(
+                            text='Not Enough Data',
+                            halign='center')
+        self.NEDLabel.font_size = '18sp'
+        self.NEDLabel.font_name = 'SometypeMono'
+        #label_container = self.root.get_screen('Progress').ids.graphsystem
+        graph_container = self.root.get_screen('Progress').ids.graph_container
+        graph_container.add_widget(self.NEDLabel)
+    
+    def create_graphs(self):
+        self.NEDLabel = None
+        bgrade_dict = self.make_grade_dict(self.root.get_screen('Settings').boulder_setting.lower())
+        rgrade_dict = self.make_grade_dict(self.root.get_screen('Settings').route_setting.lower())
+        date_dict = self.root.get_screen('Progress').date_dict
+        bgraph = None
+        rgraph = None
+        
+
+        win_height = dp(600)
+        container_pos_hint_y = self.root.get_screen('Progress').ids.graph_container.size_hint[1]
+        graph_height = win_height*container_pos_hint_y
+        bpoints = self.root.get_screen('Progress').bodata
+        if len(bpoints) >= 2:
+            bgraph = Plot('bouldering',bpoints,x_tick_names=date_dict,y_tick_names=bgrade_dict,size_hint_y=None,height=graph_height)
+
+        rpoints = self.root.get_screen('Progress').rodata
+        if len(rpoints) >= 2:
+            rgraph = Plot('routes',rpoints,x_tick_names=date_dict,y_tick_names=rgrade_dict,size_hint_y=None)
+            
+        return bgraph,rgraph
+
+    def change_state(self):
+        progress = self.root.get_screen('Progress')
+        bstate = progress.ids.bstate.state
+        rstate = progress.ids.rstate.state
+        container = progress.ids.graph_container
+        label_container = progress.ids.graphsystem
+        
+        if len(container.children) > 0:
+            container.remove_widget(container.children[0])
+        else:
+            label_container.remove_widget(label_container.children[0])
+        
+        if rstate == 'down':
+            progress.gstate = 'route'
+
+            if self.rgraph:
+                container.add_widget(self.rgraph)
+            else:
+                self.set_NED_label()
+        else:
+            progress.gstate = 'boulder'
+
+            if self.bgraph:
+                container.add_widget(self.bgraph)
+            else:
+                self.set_NED_label()
+        self.set_grade_display()
 
     def create_datatables(self):
         bldr_data = sqlite3.connect("boulder_data.db")
@@ -291,83 +874,83 @@ class BoulderBuddyApp(MDApp):
         cur.close()
         bldr_data.close()
 
-    def create_grades_list(self,types,system):
+    def create_grades_list(self,system):
         grades = []
-        if types == 'bouldering':
-            if system == 'USA':
-                for i in range(18):
-                    vgrade = 'V' + str(i)
-                    dropdown_item = {'viewclass': 'OneLineListItem', 'text':vgrade, 'on_release': lambda x=vgrade:self.grade_callback(x)}
-                    grades.append(dropdown_item)
-                    
-            if system == 'FONT':
-                fontgrades = ['4','4+','5','5+']
-                for i in range(6,9):
-                    for j in ['a','b','c']:
-                        fontgrades.append(str(i)+j)
-                        fontgrades.append(str(i)+j+'+')
-                fontgrades.append('9a')
+        if system == 'USA':
+            for i in range(18):
+                vgrade = 'V' + str(i)
+                dropdown_item = {'viewclass': 'OneLineListItem', 'text':vgrade, 'on_release': lambda x=vgrade:self.grade_callback(x)}
+                grades.append(dropdown_item)
+                
+        elif system == 'FONT':
+            fontgrades = ['4','4+','5','5+']
+            for i in range(6,9):
+                for j in ['a','b','c']:
+                    fontgrades.append(str(i)+j)
+                    fontgrades.append(str(i)+j+'+')
+            fontgrades.append('9a')
 
-                for i in fontgrades:
-                    dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
-                    grades.append(dropdown_item)
+            for i in fontgrades:
+                dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
+                grades.append(dropdown_item)
 
-            if system == 'DAN':
-                dangrades = []
-                for i in range(7):
-                    kyu = str(7-i) + ' kyu'
-                    dangrades.append(kyu)
-                for i in range(1,7):
-                    dan = str(i) + ' dan'
-                    dangrades.append(dan)
+        elif system == 'DAN':
+            dangrades = []
+            for i in range(7):
+                kyu = str(7-i) + ' kyu'
+                dangrades.append(kyu)
+            for i in range(1,7):
+                dan = str(i) + ' dan'
+                dangrades.append(dan)
 
-                for i in dangrades:
-                    dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
-                    grades.append(dropdown_item)
+            for i in dangrades:
+                dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
+                grades.append(dropdown_item)
 
-        if types == 'route':
-            if system == 'YDS':
-                ydsgrades = []
-                for i in range (1,10):
-                    grade = '5.' + str(i)
+        elif system == 'YDS':
+            ydsgrades = []
+            for i in range (1,10):
+                grade = '5.' + str(i)
+                ydsgrades.append(grade)
+            for i in range(10,16):
+                for j in ['a','b','c','d']:
+                    grade = '5.' + str(i) + j
                     ydsgrades.append(grade)
-                for i in range(10,16):
-                    for j in ['a','b','c','d']:
-                        grade = '5.' + str(i) + j
-                        ydsgrades.append(grade)
 
-                for i in ydsgrades:
-                    dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
-                    grades.append(dropdown_item)
+            for i in ydsgrades:
+                dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
+                grades.append(dropdown_item)
 
-            if system == 'FR':
-                frgrades = ['1','2','3','4','5a','5b','5c']
-                for i in range(6,10):
-                    for j in ['a','b','c']:
-                        grade1 = str(i) + j
-                        grade2 = str(i) + j + '+'
-                        frgrades.append(grade1)
-                        frgrades.append(grade2)
+        elif system == 'FR':
+            frgrades = ['1','2','3','4','5a','5b','5c']
+            for i in range(6,10):
+                for j in ['a','b','c']:
+                    grade1 = str(i) + j
+                    grade2 = str(i) + j + '+'
+                    frgrades.append(grade1)
+                    frgrades.append(grade2)
 
-                for i in frgrades:
-                    dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
-                    grades.append(dropdown_item)
+            for i in frgrades:
+                dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
+                grades.append(dropdown_item)
 
-            if system == 'AUS':
-                ausgrades = []
-                for i in range(40):
-                    ausgrades.append(str(i))
+        elif system == 'AUS':
+            ausgrades = []
+            for i in range(40):
+                ausgrades.append(str(i))
 
-                for i in ausgrades:
-                    dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
-                    grades.append(dropdown_item)
+            for i in ausgrades:
+                dropdown_item = {'viewclass': 'OneLineListItem', 'text':i, 'on_release': lambda x=i:self.grade_callback(x)}
+                grades.append(dropdown_item)
+        else:
+            print('FUCK SOMETHING IS WRONG OH GOD')
                 
         return grades
     
     
 
 
-    def set_carousel(self):
+    def set_grade_carousel(self):
         bogrades = {'USA':0,'FONT':1,'DAN':2}
         rogrades = {'YDS':0,'FR':1,'AUS':2}
         
@@ -379,6 +962,14 @@ class BoulderBuddyApp(MDApp):
         self.root.get_screen(current_screen).ids.grade.text = grade
         self.grade_menu.dismiss()
 
+    def type_callback(self,types):
+        current_screen = self.root.current
+        if self.root.get_screen(current_screen).types != types.lower():
+            self.root.get_screen(current_screen).ids.grade.text = ''
+            self.root.get_screen(current_screen).types = types.lower()
+        self.root.get_screen(current_screen).ids.typechoice.text = types
+        self.types_menu.dismiss()
+
 
     def set_current_grade_system(self,types):
         settings = self.root.get_screen('Settings')
@@ -388,12 +979,24 @@ class BoulderBuddyApp(MDApp):
         if types == 'route':
             grade_systems = {'YDS':self.yds,'FR':self.fr,'AUS':self.aus}
             return grade_systems[settings.route_setting]
+
+    def open_types_menu(self):
+        boulder = {'viewclass': 'OneLineListItem', 'text': 'Boulder', 'on_release': lambda x='Boulder':self.type_callback(x)}
+        route = {'viewclass': 'OneLineListItem', 'text': 'Route', 'on_release': lambda x='Route':self.type_callback(x)}
+        type_list = [boulder,route]
+        current_screen= self.root.current
+        self.types_menu = MDDropdownMenu(caller=self.root.get_screen(current_screen).ids.typechoice, items = type_list, width_mult = 2)
+        self.types_menu.open()
+        
+        
     
     def open_grade_menu(self):
         current_screen = self.root.current
         current_grade_system = self.set_current_grade_system(self.root.get_screen('Entry').types)
-        self.grade_menu = MDDropdownMenu(caller=self.root.get_screen(current_screen).ids.grade,items = current_grade_system,width_mult=2)
-        self.grade_menu.open()
+        if current_grade_system:
+            self.grade_menu = MDDropdownMenu(caller=self.root.get_screen(current_screen).ids.grade,items = current_grade_system,width_mult=2)
+            self.grade_menu.open()
+
 
     def open_edit_grade_menu(self):
         current_screen = self.root.current
@@ -416,78 +1019,123 @@ class BoulderBuddyApp(MDApp):
         self.root.get_screen(current_screen).ids.grade.text = ""
         self.root.get_screen(current_screen).ids.attempts.text = ""
 
-    def on_save(self,value,instance,date_range):
-        current_screen = self.root.current
-        self.root.get_screen(current_screen).ids.date.text = str(instance)
-
-    def show_date_picker(self):
-        date_dialog = MDDatePicker()
-        date_dialog.bind(on_save=self.on_save)
-        date_dialog.open()
-
-
-    def input_data(self):
-        date = self.root.get_screen('Entry').ids.date.text
-        grade = self.root.get_screen('Entry').ids.grade.text
-        attempts = self.root.get_screen('Entry').ids.attempts.text
-        completed = self.root.get_screen('Entry').ids.complete.active
-
+    def input_fake_data(self,date,grade,attempts,completed,types):
+        idnum = None
         datatable = None
-        if self.root.get_screen('Entry').types == 'boulder':
+        if types == 'boulder':
             datatable = self.root.get_screen('Settings').boulder_setting.lower()
-        if self.root.get_screen('Entry').types == 'route':
+            self.b_max_idnum += 1
+            idnum = self.b_max_idnum
+        if types == 'route':
             datatable = self.root.get_screen('Settings').route_setting.lower()
+            self.r_max_idnum += 1
+            idnum = self.r_max_idnum
 
+        
         bldr_data = sqlite3.connect("boulder_data.db")
         cur = bldr_data.cursor()
+
         cur.execute('''CREATE TABLE IF NOT EXISTS %s
                     (id INT, date TEXT, grade TEXT, attempts INT, completed INT)''' % datatable)
         bldr_data.commit()
-
-        cur.execute('''SELECT * FROM %s''' % datatable)
-
-        idnum = len(cur.fetchall()) + 1
+            
         cur.execute('''INSERT INTO %s (id, date, grade, attempts,completed) VALUES (?,?,?,?,?)''' % datatable,(idnum,date,grade,attempts,completed))
         bldr_data.commit()
+
+        self.add_entry(idnum,date,grade,attempts,completed,types)          
 
         cur.close()
         bldr_data.close()
 
         timezone = self.root.get_screen('Settings').timezone
         timeline_grade = self.MLE(datatable,timezone,self.date_to_utc(date))[1]
-        self.update_MLE(date,timeline_grade,datatable)
-        self.update_timeline_table(date,datatable)
-        self.clear()
+        self.update_MLE(date,timeline_grade,types)
+        self.update_timeline_table(date,types)
+        self.update_graph_grade()
+        entry_screen.clear_display()
+        self.root.current = 'Main Menu'
+        
+        
 
-    def edit_data(self):
-        idnum = self.root.get_screen('EditEntry').row_id
-        date = self.root.get_screen('EditEntry').ids.date.text
-        grade = self.root.get_screen('EditEntry').ids.grade.text
-        attempts = self.root.get_screen('EditEntry').ids.attempts.text
-        completed = self.root.get_screen('EditEntry').ids.complete.active
-        old_data = self.root.get_screen('EditEntry').row_data
-        new_data = (date,grade,attempts,completed)
+    def input_data(self,entry_screen):
+        date,grade,attempts,completed,types = entry_screen.get_data()
+        idnum = None
+        datatable = None
+        if entry_screen.types == 'boulder':
+            datatable = self.root.get_screen('Settings').boulder_setting.lower()
+            self.b_max_idnum += 1
+            idnum = self.b_max_idnum
+        if entry_screen.types == 'route':
+            datatable = self.root.get_screen('Settings').route_setting.lower()
+            self.r_max_idnum += 1
+            idnum = self.r_max_idnum
 
+        
         bldr_data = sqlite3.connect("boulder_data.db")
         cur = bldr_data.cursor()
 
-        datatable = None
-        if self.root.get_screen('Edit').page == 0:
-            datatable = self.root.get_screen('Settings').boulder_setting.lower()
-        if self.root.get_screen('Edit').page == 1:
-            datatable = self.root.get_screen('Settings').route_setting.lower()
+        if entry_screen.edit == False:
+            cur.execute('''CREATE TABLE IF NOT EXISTS %s
+                        (id INT, date TEXT, grade TEXT, attempts INT, completed INT)''' % datatable)
+            bldr_data.commit()
+            
+            cur.execute('''INSERT INTO %s (id, date, grade, attempts,completed) VALUES (?,?,?,?,?)''' % datatable,(idnum,date,grade,attempts,completed))
+            bldr_data.commit()
 
-        cur.execute('''UPDATE %s SET date = ?, grade = ?, attempts = ?, completed = ? WHERE id = ?''' % datatable,(new_data[0],new_data[1],new_data[2],new_data[3],idnum))
-        bldr_data.commit()
+            self.add_entry(idnum,date,grade,attempts,completed,types)
+
+        else:
+            entry = entry_screen.caller
+            idnum = entry.idnum
+            cur.execute('''UPDATE %s SET date = ?, grade = ?, attempts = ?, completed = ? WHERE id = ?''' % datatable,(date,grade,attempts,completed,idnum))
+            bldr_data.commit()
+            entry.update(date,grade,attempts,completed,types)
+            
 
         cur.close()
-
         bldr_data.close()
 
-        self.update_timeline_table(date,datatable)
-        self.displaydatatable()
-        self.root.transition.direction = 'right'
-        self.root.current = 'Edit'
+        timezone = self.root.get_screen('Settings').timezone
+        timeline_grade = self.MLE(datatable,timezone,self.date_to_utc(date))[1]
+        self.update_MLE(date,timeline_grade,types)
+        self.update_timeline_table(date,types)
+        self.update_graph_grade()
+        entry_screen.clear_display()
+        self.root.current = 'Main Menu'
+
+    def add_entry(self,idnum,date,grade,attempts,completed,types):
+        types = types.lower()
+        container = self.root.get_screen('Main Menu').ids.entry_container
+        new_entry= EntryItem(idnum=idnum,
+                             date=date,
+                              grade=grade,
+                              attempts=attempts,
+                              comp = completed,
+                              types=types,
+                              size=('100dp','100dp'),
+                              pos_hint={'center_x':0.5,'center_y':0.5},
+                              size_hint_y=None)
+        
+        true_index = 0
+        date_list = []
+        for i in container.children:
+            date_list.append(datetime.strptime(i.date,'%Y-%m-%d'))
+        date_num = datetime.strptime(date,'%Y-%m-%d')
+        if len(date_list) == 0:
+            pass
+        elif date_num < date_list[0]:
+            true_index = 0
+        elif date_num >= date_list[len(date_list)-1]:
+            true_index = len(date_list)
+        else:
+            for i in date_list:
+                if i > date_num:
+                    break
+                true_index += 1
+        
+        
+        container.add_widget(new_entry,index=true_index)
+
         
         
 
@@ -544,6 +1192,8 @@ class BoulderBuddyApp(MDApp):
         if self.root.get_screen('Edit').page == 1:
             datatable = self.root.get_screen('Settings').route_setting.lower()
             data = self.pull_data(datatable)
+
+        data.reverse()
         
         bldrtable = MDDataTable(
             pos_hint = {'center_x':0.5,'center_y':0.5},
@@ -568,22 +1218,60 @@ class BoulderBuddyApp(MDApp):
         self.root.transition.direction = 'right'
         self.root.current = self.root.get_screen('Settings').previous_screen
 
+    def update_graph_grade(self):
+        settings_screen = self.root.get_screen('Settings')
+        progress_screen = self.root.get_screen('Progress')
+
+        bsystem = settings_screen.boulder_setting
+        rsystem = settings_screen.route_setting
+        
+        bgrade_dict = self.make_grade_dict(bsystem)
+        rgrade_dict = self.make_grade_dict(rsystem)
+        date_dict = progress_screen.date_dict
+
+        progress_screen.bsystem,progress_screen.rsystem = progress_screen.get_grade_settings()
+        progress_screen.bodata,progress_screen.rodata = progress_screen.get_timeline_data()
+
+        container = progress_screen.ids.graph_container
+        label_container = progress_screen.ids.graphsystem
+        bpoints = progress_screen.bodata
+
+        if len(container.children) > 0:
+            old_plot = container.children[0]
+            container.remove_widget(old_plot)
+        else:
+            old_NED_label = label_container.children[0]
+            label_container.remove_widget(old_NED_label)
+        
+
+        self.bgraph,self.rgraph = self.create_graphs()
+        if self.bgraph:
+            container.bind(minimum_size=container.setter('size'))
+            container.add_widget(self.bgraph)
+        else:
+            self.set_NED_label()
+
     def SetGradeSettings(self):
         boulder_grade = self.root.get_screen('Grading').ids.bocar.current_slide.children[1].text
         route_grade = self.root.get_screen('Grading').ids.rocar.current_slide.children[1].text
+        timezone = self.root.get_screen('Settings').timezone
+        current_boulder_slope,current_boulder_grade = self.MLE(boulder_grade.lower(),timezone)
+        current_route_slope,current_route_grade = self.MLE(route_grade.lower(),timezone)
 
-        self.root.get_screen('Settings').boulder_setting = boulder_grade
-        self.root.get_screen('Settings').route_setting = route_grade
+        settings_screen = self.root.get_screen('Settings')
+        settings_screen.boulder_setting = boulder_grade
+        settings_screen.route_setting = route_grade
+        settings_screen.current_boulder_grade = current_boulder_grade
+        settings_screen.current_boulder_slope = current_boulder_slope
+        settings_screen.current_route_grade = current_route_grade
+        settings_screen.current_route_slope = current_route_slope
 
-        with open('settings.json','r+') as settings_file:
-            data = json.load(settings_file)
-            data['boulder_grading'] = boulder_grade
-            data['route_grading'] = route_grade
-            settings_file.seek(0)
-            json.dump(data, settings_file, indent = 4)
-            settings_file.truncate()
+        settings_screen.update_settings_file()
+        
 
-        self.root.transition.direction = 'right'
+        self.update_graph_grade()
+        self.update_grade(self.root.get_screen('Progress').gstate)
+        self.set_grade_display()
         self.root.current = 'Settings'
 
     def GMT_to_timezone(self,date,timezone):
@@ -601,8 +1289,10 @@ class BoulderBuddyApp(MDApp):
         
 
     def logL(self,log_par,send_data,nosend_data):
+        np.seterr(divide='ignore')
         m,c = np.exp(log_par)
         logL = np.sum(np.log(self.psend(m,c,send_data))) + np.sum(np.log(self.pnosend(m,c,nosend_data)))
+        np.seterr(divide='warn')
         return logL
         
 
@@ -622,42 +1312,62 @@ class BoulderBuddyApp(MDApp):
         return filtered_data
             
     def grade_to_number(self,grade,system):
-        if system == 'usa':
-            number = int(grade[1:])
-            return number
-
+        grade_dict = self.make_grade_dict(system)
+        swapped_dict = {value: key for key, value in grade_dict.items()}
+        return swapped_dict[grade]
+        
+    #calculated score is the number not just V0 V1
     def number_to_grade(self,number,system):
+        grade_dict = self.make_grade_dict(system)
         if type(number) is str:
             return 'N/A'
         num = round(number,1)
         if system == 'usa':
             grade = 'V' + str(num)
             return grade
+        else:
+            #this is temporary
+            num = floor(number)
+            num_remainder = round(number - num,1)
+            grade = str(grade_dict[num]) + ' (' + str(num_remainder) + ')'
+            return grade
+        
+            
 
     def make_grade_dict(self,system):
         grade_dict = {}
-        if system == 'usa':
-            for i in range(18):
-                grade = self.number_to_grade(i,system)
-                grade_dict[i] = grade
+        grades_list = []
+        grades_list_raw = self.create_grades_list(system.upper())
+        for i in grades_list_raw:
+            grades_list.append(i['text'])
+        for i in range(len(grades_list)):
+            grade = grades_list[i]
+            grade_dict[i] = grade
 
         return grade_dict
 
     def make_date_dict(self):
         pass
 
-
+    def gsystem_to_types(self,gsystem):
+        boulder = ['usa','font','dan']
+        route = ['yds','fr','aus']
+        if gsystem in boulder:
+            return 'boulder'
+        if gsystem in route:
+            return 'route'
     def MLE(self,gsystem,timezone,date=time()):
         data = self.pull_data(gsystem)
         time_filtered_data = self.time_filter(data,timezone,date)
         send_data = []
         nosend_data = []
+        
 
         for i in time_filtered_data:
             if int(i[3]) == 1:
                 attempts = int(i[2])
                 for j in range(attempts-1):
-                    nosend_data.append(self.grade_to_number(i[1],gsystem))
+                        nosend_data.append(self.grade_to_number(i[1],gsystem))
                 send_data.append(self.grade_to_number(i[1],gsystem))
             if int(i[3]) == 0:
                 attempts = int(i[2])
@@ -669,31 +1379,63 @@ class BoulderBuddyApp(MDApp):
             m = 'N/A'
             c = 'N/A'
             return m,c
-        
+        start_m = 1
+        start_c = 1
+        settings_screen = self.root.get_screen('Settings')
+        types = self.gsystem_to_types(gsystem)
+        if types == 'boulder' and settings_screen.current_boulder_grade != 'N/A':
+            start_m = np.log(float(settings_screen.current_boulder_slope))
+            start_c = np.log(float(settings_screen.current_boulder_grade))
+        if types == 'route' and settings_screen.current_route_grade != 'N/A':
+            start_m = np.log(float(settings_screen.current_route_slope))
+            start_c = np.log(float(settings_screen.current_route_grade))
         res = opt.minimize(
             fun = lambda log_params,send_data,nosend_data: -self.logL(log_params,send_data,nosend_data),
-            x0 = np.array([1,1]), args = (send_data,nosend_data), method = 'BFGS')
+            x0 = np.array([start_m,start_c]), args = (send_data,nosend_data), method = 'BFGS')
         m,c = np.exp(res.x)
         return m,c
 
     def set_grade_display(self):
-        gsystem = self.root.get_screen('Settings').boulder_setting.lower()
-        self.root.get_screen('Main Menu').ids.currentgrade.text = self.number_to_grade(self.root.get_screen('Settings').current_grade,gsystem)
+        progress = self.root.get_screen('Progress')
+        gsystem = None
+        if progress.gstate == 'boulder':
+            gsystem = self.root.get_screen('Settings').boulder_setting.lower()
+            progress.ids.currentgrade.text = self.number_to_grade(self.root.get_screen('Settings').current_boulder_grade,gsystem)
+        else:
+            gsystem = self.root.get_screen('Settings').route_setting.lower()
+            progress.ids.currentgrade.text = self.number_to_grade(self.root.get_screen('Settings').current_route_grade,gsystem)
+        
+        
 
-    def update_MLE(self,date,grade,gsystem):
-        timezone = self.root.get_screen('Settings').timezone
-        with open('settings.json','r+') as settings_file:
-            data = json.load(settings_file)
-            m,c = self.MLE(gsystem,timezone)
-            data['current_slope'] = m
-            data['current_grade'] = c
-            self.root.get_screen('Main Menu').ids.currentgrade.text = self.number_to_grade(data['current_grade'],gsystem)
-            self.root.get_screen('Settings').ids.current_grade = self.number_to_grade(data['current_grade'],gsystem)
-            self.root.get_screen('Settings').ids.current_slope = m
-            settings_file.seek(0)
-            json.dump(data,settings_file,indent=4)
-            settings_file.truncate()
+    def update_grade(self,types):
+        settings_screen = self.root.get_screen('Settings')
+        timezone = settings_screen.timezone
+        gsystem = None
+        if types == 'boulder':
+            gsystem = settings_screen.boulder_setting.lower()
+            m,c=self.MLE(gsystem,timezone)
+            settings_screen.current_boulder_slope = m
+            settings_screen.current_boulder_grade = c
+            self.root.get_screen('Progress').ids.currentgrade.text = self.number_to_grade(settings_screen.current_boulder_grade,gsystem)
+        else:
+            gsystem = settings_screen.route_setting.lower()
+            m,c=self.MLE(gsystem,timezone)
+            settings_screen.current_route_slope = m
+            settings_screen.current_route_grade = c
+            self.root.get_screen('Progress').ids.currentgrade.text = self.number_to_grade(settings_screen.current_route_grade,gsystem)
+        settings_screen.update_settings_file()
+        
+        
+            
 
+    def update_MLE(self,date,grade,types):
+            settings_screen = self.root.get_screen('Settings')
+            gsystem = None
+            if types == 'boulder':
+                gsystem = settings_screen.boulder_setting.lower()
+            else:
+                gsystem = settings_screen.route_setting.lower()
+            
             bldr_data = sqlite3.connect('boulder_data.db')
             cur = bldr_data.cursor()
             
@@ -712,6 +1454,7 @@ class BoulderBuddyApp(MDApp):
             
             cur.close()
             bldr_data.close()
+            self.update_grade(types)
             
 
             
@@ -758,10 +1501,16 @@ class BoulderBuddyApp(MDApp):
         utc = self.GMT_to_timezone(timegm(datetime_object.timetuple()),timezone)
         return utc
 
-    def update_timeline_table(self,date,gsystem):
+    def update_timeline_table(self,date,types):
+        settings_screen = self.root.get_screen('Settings')
+        gsystem = None
+        if types == 'boulder':
+            gsystem = settings_screen.boulder_setting.lower()
+        else:
+            gsystem = settings_screen.route_setting.lower()
         datatable = gsystem + '_timeline'
         
-        timezone = self.root.get_screen('Settings').timezone
+        timezone = settings_screen.timezone
         bldr_data = sqlite3.connect('boulder_data.db')
         cur = bldr_data.cursor()
         
@@ -781,12 +1530,17 @@ class BoulderBuddyApp(MDApp):
 
         prog_screen = self.root.get_screen('Progress')
         prog_screen.bodata,prog_screen.rodata = prog_screen.get_timeline_data()
-        self.bgraph.plot.points = prog_screen.bodata
+        if self.bgraph:
+            self.bgraph.plot.points = prog_screen.bodata
+        if self.rgraph:
+            self.rgraph.plot.points = prog_screen.rodata
+
+
+
         
         
         
         
-            
 
 
         
@@ -807,9 +1561,6 @@ class BoulderBuddyApp(MDApp):
 
 
 
-        
-def generate_fake_dataset():
-    pass
     
 
 

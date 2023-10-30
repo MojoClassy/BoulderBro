@@ -1,92 +1,53 @@
+#:import NoTransition kivy.uix.screenmanager.NoTransition
 ScreenManager:
+	transition: NoTransition()
+	
 	MainMenuScreen:
 	EntryScreen:
-	EntryChoiceScreen:
-	EditScreen:
-	EditEntryScreen:
+		name: 'Entry'
+	EntryScreen:
+		name: 'EditEntry'
 	SettingsScreen:
 	GradingScreen:
 	ProgressScreen:
 
 
+	
+			
+
 <MainMenuScreen>:
 	name: 'Main Menu'
 	
-	MDFloatLayout:
 	
-		MDLabel:
-			id: gradelabel
-			theme_text_color: 'Custom'
-			text_color: 'white'
-			text: 'Current grade:'
-			halign: 'center'
-			size_hint: 0.3,0.1
-			font_size: 36
-			pos_hint: {'center_x':0.5,'center_y':0.7}
-		
-		MDLabel:
-			id: currentgrade
-			text: 'N/A'
-			theme_text_color: 'Custom'
-			text_color: 'white'
-			halign: 'center'
-			size_hint: 0.2,0.1
-			font_size: 48
-			pos_hint: {'center_x':0.5,'center_y':0.62}
-			
-			
-		MDRoundFlatIconButton:
-			text: 'New Entry'
-			theme_text_color: 'Custom'
-			text_color: 'white'
-			icon: 'plus'
-			font_size: 24
-			pos_hint: {'center_x':0.5,'center_y':0.5}
-			on_release:
-				app.update_screen()
-				root.manager.transition.direction = 'left'
-				root.manager.current = 'EntryChoice'
-		
-		MDRoundFlatIconButton:
-			text: 'Edit Entry'
-			theme_text_color: 'Custom'
-			text_color: 'white'
-			icon: 'pencil-outline'
-			font_size: 24
-			pos_hint: {'center_x':0.5,'center_y':0.4}
-			on_release:
-				app.update_screen()
-				app.displaydatatable()
-				root.manager.transition.direction = 'left'
-				root.manager.current = 'Edit'
-		
-		MDRoundFlatIconButton:
-			text: 'Progress'
-			theme_text_color: 'Custom'
-			text_color: 'white'
-			icon: 'chart-timeline-variant'
-			font_size: 24
-			pos_hint: {'center_x':0.5,'center_y':0.3}
-			on_release:
-				app.update_screen()
-				root.manager.transition.direction = 'left'
-				root.manager.current = 'Progress'
-			
-		MDRoundFlatIconButton:
-			text: 'Settings '
-			theme_text_color: 'Custom'
-			text_color: 'white'
-			icon: 'cog'
-			font_size: 24
-			pos_hint: {'center_x':0.5,'center_y':0.2}
-			on_release:
-				app.update_screen()
-				root.manager.transition.direction = 'left'
-				root.manager.current = 'Settings'
-		
 
+	MDFloatLayout:
+		MDScrollView:
+			MDGridLayout:
+				id: entry_container
+				padding: 20
+				spacing: 10
+				cols: 1
+				size_hint_y: None
+				height: self.minimum_height
+
+		MDBottomAppBar:
+			MDTopAppBar:
+				icon: 'plus'
+				type: 'bottom'
+				mode: 'center'
+				on_action_button: app.toolbar_callbacks('new entry')
+				left_action_items:
+					[
+					['home',lambda x: app.toolbar_callbacks('entries')],
+					['chart-timeline-variant',lambda x: app.toolbar_callbacks('progress')]
+					]
+				right_action_items:
+					[
+					['account-multiple',lambda x: app.toolbar_callbacks('compare')],
+					['cog',lambda x: app.toolbar_callbacks('settings')]
+					]
+		
 <EntryScreen>:
-	name: 'Entry'
 	MDFloatLayout:
 		size: root.width, root.height
 		md_bg_color: 0,0,0,1
@@ -94,61 +55,115 @@ ScreenManager:
 		MDIconButton:
 			size_hint: 0.2,0.2
 			icon: 'arrow-left'
-			pos_hint: {'center_x':0.05, 'center_y':0.95}
-			on_release: 
-				root.manager.transition.direction = 'right'
-				root.manager.current = 'EntryChoice'
+			pos_hint: {'center_x':0.1, 'center_y':0.95}
+			on_release:			
+				root.manager.current = 'Main Menu'
+				root.clear_display()
 		
 		MDIconButton:
 			size_hint: 0.2,0.2
 			icon: 'cog'
-			pos_hint: {'center_x':0.95,'center_y':0.95}
+			pos_hint: {'center_x':0.9,'center_y':0.95}
 			on_release:
 				app.update_screen()
 				root.manager.transition.direction = 'left'
 				root.manager.current = 'Settings'
-			
 		
-		MDTextField:
+		
+		MDRectangleFlatIconButton:
 			id: date
-			mode: 'round'
-			hint_text: 'yyyy-mm-dd'
-			font_size: 18
-			size_hint: None, None
-			width: root.width*0.2
-			pos_hint: {'center_x': 0.5, 'center_y': 0.7}
-			
-		MDIconButton:
-			size_hint: 0.1,0.1
 			icon: 'calendar'
-			pos_hint: {'center_x':0.58,'center_y':0.7}
-			on_release: app.show_date_picker()
-			
-		MDTextField:
-			id: grade
-			mode: 'round'
-			hint_text: 'grade'
-			font_size: 18
-			size_hint: None, None
-			width: root.width*0.2
-			pos_hint: {'center_x': 0.5, 'center_y': 0.6}
-			on_focus: app.open_grade_menu() if self.focus else None
+			font_size: '14sp'
+			font_name: 'SometypeMono'
+			pos_hint: {'center_x':0.25, 'center_y':0.8}
+			on_release:
+				root.show_date_picker()
 		
-		MDTextField:
-			id: attempts
-			mode: 'round'
-			hint_text: 'attempts'
-			font_size: 18
-			size_hint: None, None
-			width: root.width*0.2
-			pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+		MDBoxLayout:
+			id: typechoice
+			adaptive_size: True
+			spacing: '10dp'
+			pos_hint: {'center_x': 0.75,'center_y':0.8}
+			
+			MyToggleButton:
+				id: bstate
+				text: 'Boulder'
+				font_size: '14sp'
+				font_name: 'SometypeMono'
+				group: 'system'
+				on_release:
+					root.change_grade_state(self)
+			MyToggleButton:
+				id: rstate
+				text: 'Route'
+				font_size: '14sp'
+				font_name: 'SometypeMono'
+				group: 'system'
+				on_release:
+					root.change_grade_state(self)
+			
+		MDCard:
+			id: scrollcontainer
+			pos_hint: {'center_x':0.5,'center_y':0.6}
+			size_hint: 0.8,0.1
+			md_bg_color: 0,0,0,1
+			MDScrollView:
+				id: gradescroller
+				do_scroll_x: True
+				do_scroll_y: False
+				bar_color: 0,0,0,0
+				bar_inactive_color: 0,0,0,0
+				MDGridLayout:
+					id: gradecontainer
+					rows: 1
+					spacing: 10
+					width: self.minimum_width
+					size_hint_x: None
 		
 		MDAnchorLayout:
-			pos_hint: {'center_x':0.47,'center_y':0.4}
+			pos_hint: {'center_x':0.5,'center_y':0.5}
+			MDLabel:
+				text: 'Attempts'
+				halign: 'center'
+				font_name: 'SometypeMono'
+				font_size: '14sp'
+				size_hint: 0.25,0.1
+				color: 1,1,1,1
+		
+		MDAnchorLayout:
+			pos_hint: {'center_x':0.5,'center_y':0.45}
+			MDLabel:
+				id: attempts
+				halign: 'center'
+				font_name: 'SometypeMono'
+				font_size: '14sp'
+				size_hint: 0.2,0.1
+				color: 1,1,1,1
+				text: str(root.attempts)
+			
+		MDIconButton:
+			id: minus
+			icon: 'minus'
+			pos_hint: {'center_x':0.4,'center_y':0.45}
+			on_release:
+				root.minus(root.ids.attempts)
+			
+		MDIconButton:
+			id: plus
+			icon: 'plus'
+			pos_hint: {'center_x':0.6,'center_y':0.45}
+			on_release:
+				root.plus(root.ids.attempts)
+				
+		
+		
+		MDAnchorLayout:
+			pos_hint: {'center_x':0.45,'center_y':0.35}
 			MDLabel:
 				id: comp_checkbox
 				text: 'Completed:'
-				font_size: 24
+				font_size: '14sp'
+				font_name: 'SometypeMono'
 				theme_text_color: 'Custom'
 				text_color: 'white'
 				halign: 'center'
@@ -156,200 +171,26 @@ ScreenManager:
 		MDCheckbox:
 			id: complete
 			size_hint: 0.1,0.1
-			pos_hint: {'center_x':0.57,'center_y':0.4}
+			pos_hint: {'center_x':0.65,'center_y':0.35}
 			color_inactive: 'white'
 			color_active: 'white'
+			on_release:
+				root.comp = self.active
 		
-		MDRoundFlatButton:
-			id: clear
-			text: 'Clear'
-			font_size: 18
-			size_hint: None,None
-			width: root.width*0.15
-			pos_hint: {'center_x': 0.4, 'center_y': 0.3}
-			on_press: app.clear()
-		
-		MDRoundFlatButton:
+		MDRectangleFlatButton:
 			id: submit
 			text: 'Submit'
-			font_size: 18
-			size_hint: None,None
-			width: root.width*0.15
-			pos_hint: {'center_x': 0.6, 'center_y': 0.3}
+			font_size: '14sp'
+			font_name: 'SometypeMono'
+			pos_hint: {'center_x': 0.5, 'center_y': 0.25}
 			on_press: 
-				app.input_data()
+				app.input_data(root)
 
 
-<EntryChoiceScreen>:
-	name: 'EntryChoice'
-	MDFloatLayout:
-		MDIconButton:
-			size_hint: 0.2,0.2
-			icon: 'arrow-left'
-			pos_hint: {'center_x':0.05, 'center_y':0.95}
-			on_release: 
-				root.manager.transition.direction = 'right'
-				root.manager.current = 'Main Menu'
-		
-		MDIconButton:
-			size_hint: 0.2,0.2
-			icon: 'cog'
-			pos_hint: {'center_x':0.95,'center_y':0.95}
-			on_release:
-				app.update_screen()
-				root.manager.transition.direction = 'left'
-				root.manager.current = 'Settings'
-		
-		MDCard:
-			size_hint: 0.3,0.3
-			pos_hint: {'center_x':0.33,'center_y':0.5}
-			md_bg_color: '#EDD55F'
-			MDAnchorLayout:
-				MDRoundFlatButton:
-					text:'Boulder'
-					font_size: 36
-					size_hint: None, None
-					width: root.width*0.2
-					on_release: 
-						root.manager.get_screen('Entry').types = 'boulder'
-						root.manager.transition.direction = 'left'
-						root.manager.current = 'Entry'
-		
-		MDCard:
-			size_hint: 0.3,0.3
-			pos_hint: {'center_x':0.67,'center_y':0.5}
-			md_bg_color: '#EDD55F'
-			MDAnchorLayout:
-				MDRoundFlatButton:
-					text:'Route'
-					font_size: 36
-					size_hint: None, None
-					width: root.width*0.2
-					on_release:
-						root.manager.get_screen('Entry').types = 'route'
-						root.manager.transition.direction = 'left'
-						root.manager.current = 'Entry'
 					
 
-<EditScreen>:
-	name: 'Edit'
-	MDIconButton:
-		size_hint: 0.2,0.2
-		icon: 'arrow-left'
-		pos_hint: {'center_x':0.05, 'center_y':0.95}
-		on_release: 
-			root.manager.transition.direction = 'right'
-			root.manager.current = 'Main Menu'
-		
-	MDIconButton:
-		size_hint: 0.2,0.2
-		icon: 'cog'
-		pos_hint: {'center_x':0.95,'center_y':0.95}
-		on_release:
-			app.update_screen()
-			root.manager.transition.direction = 'left'
-			root.manager.current = 'Settings'
-	
-	MDIconButton:
-		size_hint: 0.2,0.2
-		icon: 'chevron-right'
-		pos_hint: {'center_x':0.9,'center_y':0.85}
-		on_release:
-			root.manager.get_screen('Edit').page = (root.manager.get_screen('Edit').page + 1) % 2
-			root.manager.get_screen('Edit').remove_widget(root.manager.get_screen('Edit').children[0])
-			app.displaydatatable()
 	
 		
-<EditEntryScreen>:
-	name: 'EditEntry'
-	MDFloatLayout:
-		size: root.width, root.height
-		md_bg_color: 0,0,0,1
-		
-		MDIconButton:
-			size_hint: 0.2,0.2
-			icon: 'arrow-left'
-			pos_hint: {'center_x':0.05, 'center_y':0.95}
-			on_release: 
-				root.manager.transition.direction = 'right'
-				root.manager.current = 'Edit'
-		
-		MDIconButton:
-			size_hint: 0.2,0.2
-			icon: 'cog'
-			pos_hint: {'center_x':0.95,'center_y':0.95}
-			
-		
-		MDTextField:
-			id: date
-			mode: 'round'
-			hint_text: 'yyyy-mm-dd'
-			font_size: 18
-			size_hint: None, None
-			width: root.width*0.2
-			pos_hint: {'center_x': 0.5, 'center_y': 0.7}
-			
-		MDIconButton:
-			size_hint: 0.1,0.1
-			icon: 'calendar'
-			pos_hint: {'center_x':0.58,'center_y':0.7}
-			on_release: app.show_date_picker()
-			
-		MDTextField:
-			id: grade
-			mode: 'round'
-			hint_text: 'grade'
-			font_size: 18
-			size_hint: None, None
-			width: root.width*0.2
-			pos_hint: {'center_x': 0.5, 'center_y': 0.6}
-			on_focus: app.open_edit_grade_menu() if self.focus else None
-		
-		MDTextField:
-			id: attempts
-			mode: 'round'
-			hint_text: 'attempts'
-			font_size: 18
-			size_hint: None, None
-			width: root.width*0.2
-			pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-		
-		MDAnchorLayout:
-			pos_hint: {'center_x':0.47,'center_y':0.4}
-			MDLabel:
-				id: comp_checkbox
-				text: 'Completed:'
-				font_size: 24
-				theme_text_color: 'Custom'
-				text_color: 'white'
-				halign: 'center'
-		
-		MDCheckbox:
-			id: complete
-			size_hint: 0.1,0.1
-			pos_hint: {'center_x':0.57,'center_y':0.4}
-			color_inactive: 'white'
-			color_active: 'white'
-		
-		MDRoundFlatButton:
-			id: clear
-			text: 'Clear'
-			font_size: 18
-			size_hint: None,None
-			width: root.width*0.15
-			pos_hint: {'center_x': 0.4, 'center_y': 0.3}
-			on_press: app.clear()
-		
-		
-		MDRoundFlatButton:
-			id: submit
-			text: 'Submit'
-			font_size: 18
-			size_hint: None,None
-			width: root.width*0.2
-			pos_hint: {'center_x': 0.6, 'center_y': 0.3}
-			on_press: 
-				app.edit_data()
 
 
 <SettingsScreen>
@@ -578,30 +419,75 @@ ScreenManager:
 					text_color: 'white'
 
 
-<ProgressScreen>
+
+<ProgressScreen>:
 	name: 'Progress'
-	MDIconButton:
-		size_hint: 0.2,0.2
-		icon: 'arrow-left'
-		pos_hint: {'center_x':0.05, 'center_y':0.95}
-		on_release: 
-			root.manager.transition.direction = 'right'
-			root.manager.current = 'Main Menu'
+	MDFloatLayout:
+		MDIconButton:
+			size_hint: 0.2,0.2
+			icon: 'arrow-left'
+			pos_hint: {'center_x':0.05, 'center_y':0.95}
+			on_release: 
+				root.manager.transition.direction = 'right'
+				root.manager.current = 'Main Menu'
+			
+		MDIconButton:
+			size_hint: 0.2,0.2
+			icon: 'cog'
+			pos_hint: {'center_x':0.95,'center_y':0.95}
+			on_release:
+				app.update_screen()
+				root.manager.transition.direction = 'left'
+				root.manager.current = 'Settings'
 		
-	MDIconButton:
-		size_hint: 0.2,0.2
-		icon: 'cog'
-		pos_hint: {'center_x':0.95,'center_y':0.95}
-		on_release:
-			app.update_screen()
-			root.manager.transition.direction = 'left'
-			root.manager.current = 'Settings'
-	MDGridLayout:
-		id: graph_container
-		cols: 1
-		padding: 40
-		spacing: 20
-		size_hint_y: None
+		
+		MDBoxLayout:
+			id: graphsystem
+			adaptive_size: True
+			spacing: '12dp'
+			pos_hint: {'center_x': 0.3,'center_y':0.75}
+			
+			MyToggleButton:
+				id: bstate
+				text: 'Boulders'
+				group: 'graph_system'
+				state: 'down'
+				on_release:
+					app.change_state()
+			MyToggleButton:
+				id: rstate
+				text: 'Routes'
+				group: 'graph_system'
+				on_release:
+					app.change_state()
+		MDLabel:
+			id: gradelabel
+			theme_text_color: 'Custom'
+			text_color: 'white'
+			text: 'Current grade:'
+			halign: 'center'
+			size_hint: 1,0.1
+			font_size: '18sp'
+			font_name: 'SometypeMono'
+			pos_hint: {'center_x':0.5,'center_y':0.9}
+			
+		MDLabel:
+			id: currentgrade
+			text: 'N/A'
+			theme_text_color: 'Custom'
+			text_color: 'white'
+			halign: 'center'
+			size_hint: 1,0.1
+			font_size: '24sp'
+			font_name: 'SometypeMono'
+			pos_hint: {'center_x':0.5,'center_y':0.85}
+		
+		
+		MDCard:
+			id: graph_container
+			#pos_hint: {'center_y':0.5}
+			size_hint: 0.98,0.5
+			md_bg_color: 0,0,0,0
 		
 			
 			
