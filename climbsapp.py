@@ -276,6 +276,7 @@ class SettingsScreen(Screen):
         self.current_route_grade = None
         self.current_route_slope = None
         self.timezone = 'EST'
+        print('penis')
 
         self.retrieve_settings()
 
